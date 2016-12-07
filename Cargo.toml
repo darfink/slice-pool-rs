@@ -2,5 +2,13 @@
 name = "slice-pool"
 version = "0.1.0"
 authors = ["Elliott Linder <elliott.darfink@gmail.com>"]
+description = "A library for using a slice as a memory pool"
+documentation = "https://docs.rs/slice-pool"
+keywords = ["pool", "slice", "chunk", "memory", "wrap"]
+license = "MIT"
+name = "slice-pool"
+readme = "README.md"
+repository = "https://github.com/darfink/slice-pool-rs"
+version = "0.1.0"
 
 [dependencies]
