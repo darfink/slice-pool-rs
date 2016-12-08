@@ -8,6 +8,7 @@
 //!
 //! let mut values = vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 //! let mut memory = SlicePool::new(&mut values);
+//! assert_eq!(memory.len(), 10);
 //!
 //! // Not enough memory available (only 10 elements)
 //! assert!(memory.allocate(11).is_none());
@@ -17,14 +18,10 @@
 //! first[1] = 15;
 //! assert_eq!(*first, [10, 15]);
 //!
-//! // Amount of chunks (i.e the fragmentation)
-//! assert_eq!(memory.len(), 2);
-//!
 //! let mem2 = memory.allocate(5).unwrap();
 //! assert_eq!(*mem2, [30, 40, 50, 60, 70]);
 //! assert_eq!(memory.len(), 3);
 //! ```
-
 use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::cell::RefCell;
@@ -50,9 +47,9 @@ impl<'a, T> SlicePool<'a, T> {
             .map(|slice| ChunkRef { inner: self.0.clone(), data: slice })
     }
 
-    /// Returns the number of chunks in the slice.
+    /// Returns the size of the underlying slice.
     pub fn len(&self) -> usize {
-        (*self.0).borrow().values.len()
+        (*self.0).borrow().memory.len()
     }
 }
 
@@ -181,20 +178,16 @@ mod tests {
 
         let mem = {
             let mem = memory.allocate(2).unwrap();
-            assert_eq!(memory.len(), 2);
             assert_eq!(*mem, [10, 20]);
             {
                 let mem = memory.allocate(5).unwrap();
-                assert_eq!(memory.len(), 3);
                 assert_eq!(*mem, [30, 40, 50, 60, 70]);
             }
 
             let mem = memory.allocate(1).unwrap();
-            assert_eq!(memory.len(), 3);
             assert_eq!(*mem, [30]);
             mem
         };
-        assert_eq!(memory.len(), 3);
         assert_eq!(*mem, [30]);
     }
 }
