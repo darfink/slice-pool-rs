@@ -1,13 +1,13 @@
-//! This crate provides functionality for wrapping a slice and exposing it as a
-//! chunkable interface (i.e acts as a memory pool).
+//! This crate provides functionality for using a sliceable type as the
+//! underlying memory for a pool.
 //!
-//! The underlying memory can be a mutable slice of any type.
+//! The allocated memory can be a mutable slice of any type.
 //!
 //! ```
-//! use slice_pool::SlicePool;
+//! use slice_pool::SlicePoolRef;
 //!
 //! let mut values = vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-//! let mut memory = SlicePool::new(&mut values);
+//! let mut memory = SlicePoolRef::new(&mut values);
 //! assert_eq!(memory.len(), 10);
 //!
 //! // Not enough memory available (only 10 elements)
@@ -20,7 +20,6 @@
 //!
 //! let mem2 = memory.allocate(5).unwrap();
 //! assert_eq!(*mem2, [30, 40, 50, 60, 70]);
-//! assert_eq!(memory.len(), 3);
 //! ```
 use std::mem;
 use std::ops::{Deref, DerefMut};
@@ -28,13 +27,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::fmt;
 
-/// An interface for allocating chunks in a slice.
-pub struct SlicePool<'a, T: 'a>(Rc<RefCell<ChunkableInner<'a, T>>>);
+/// An interface for allocating chunks in a referenced slice.
+pub struct SlicePoolRef<'a, T: 'a>(Rc<RefCell<ChunkableInner<'a, T>>>);
 
-impl<'a, T> SlicePool<'a, T> {
+impl<'a, T> SlicePoolRef<'a, T> {
     /// Wraps a slice with a chunkable interface.
     pub fn new(slice: &'a mut [T]) -> Self {
-        SlicePool(Rc::new(RefCell::new(ChunkableInner {
+        SlicePoolRef(Rc::new(RefCell::new(ChunkableInner {
             values: vec![Chunk { size: slice.len(), offset: 0, free: true }],
             memory: slice,
         })))
@@ -53,7 +52,7 @@ impl<'a, T> SlicePool<'a, T> {
     }
 }
 
-/// A reference to an allocated chunk.
+/// A reference to an allocated chunk, that acts as a slice.
 pub struct ChunkRef<'a, T: 'a> {
     inner: Rc<RefCell<ChunkableInner<'a, T>>>,
     data: &'a mut [T],
@@ -174,7 +173,7 @@ mod tests {
     #[test]
     fn basic() {
         let mut values = vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-        let mut memory = SlicePool::new(&mut values);
+        let mut memory = SlicePoolRef::new(&mut values);
 
         let mem = {
             let mem = memory.allocate(2).unwrap();
