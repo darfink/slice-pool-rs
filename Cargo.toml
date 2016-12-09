@@ -1,6 +1,6 @@
 [package]
 name = "slice-pool"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Elliott Linder <elliott.darfink@gmail.com>"]
 description = "A library for using a slice as a memory pool"
 documentation = "https://docs.rs/slice-pool"
