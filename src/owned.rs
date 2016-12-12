@@ -30,6 +30,11 @@ impl<T> SlicePool<T> {
             .map(|slice| PoolVal { inner: self.0.clone(), data: slice })
     }
 
+    /// Returns the pointer to the underlying slice.
+    pub fn as_ptr(&self) -> *const T {
+        (*self.0).borrow().memory.deref().as_ref().as_ptr()
+    }
+
     /// Returns the size of the underlying slice.
     pub fn len(&self) -> usize {
         (*self.0).borrow().memory.deref().as_ref().len()
