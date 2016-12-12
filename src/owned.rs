@@ -1,7 +1,6 @@
 use std::{mem, fmt};
 use std::ops::{Deref, DerefMut};
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use super::Chunk;
 
@@ -11,13 +10,13 @@ pub trait Sliceable<T>: AsMut<[T]> + AsRef<[T]> { }
 /// Implements the trait for vectors and similar types.
 impl<T, V> Sliceable<T> for V where V: AsRef<[T]> + AsMut<[T]> { }
 
-/// An interface for allocating chunks in an owned slice.
-pub struct SlicePool<T>(Rc<RefCell<ChunkableInner<T>>>);
+/// A thread-safe interface for allocating chunks in an owned slice.
+pub struct SlicePool<T>(Arc<Mutex<ChunkableInner<T>>>);
 
 impl<T> SlicePool<T> {
     /// Takes ownership of a slice with a chunkable interface
     pub fn new<Data: Sliceable<T> + 'static>(data: Data) -> Self {
-        SlicePool(Rc::new(RefCell::new(ChunkableInner {
+        SlicePool(Arc::new(Mutex::new(ChunkableInner {
             values: vec![Chunk { size: data.as_ref().len(), offset: 0, free: true }],
             memory: Box::new(data),
         })))
@@ -25,25 +24,26 @@ impl<T> SlicePool<T> {
 
     /// Allocates a new chunk in the slice.
     pub fn allocate(&mut self, size: usize) -> Option<PoolVal<T>> {
-        (*self.0).borrow_mut()
+        (*self.0).lock()
+            .unwrap()
             .allocate(size)
             .map(|slice| PoolVal { inner: self.0.clone(), data: slice })
     }
 
     /// Returns the pointer to the underlying slice.
     pub fn as_ptr(&self) -> *const T {
-        (*self.0).borrow().memory.deref().as_ref().as_ptr()
+        (*self.0).lock().unwrap().memory.deref().as_ref().as_ptr()
     }
 
     /// Returns the size of the underlying slice.
     pub fn len(&self) -> usize {
-        (*self.0).borrow().memory.deref().as_ref().len()
+        (*self.0).lock().unwrap().memory.deref().as_ref().len()
     }
 }
 
 /// An allocated chunk, that acts as a slice.
 pub struct PoolVal<T: 'static> {
-    inner: Rc<RefCell<ChunkableInner<T>>>,
+    inner: Arc<Mutex<ChunkableInner<T>>>,
     data: &'static mut [T],
 }
 
@@ -70,7 +70,7 @@ impl<T> DerefMut for PoolVal<T> {
 impl<T> Drop for PoolVal<T> {
     /// Returns the ownership of the slice.
     fn drop(&mut self) {
-        unsafe { (*self.inner).borrow_mut().release(self.data) };
+        unsafe { (*self.inner).lock().unwrap().release(self.data) };
     }
 }
 
@@ -146,3 +146,6 @@ impl<T> ChunkableInner<T> {
         }
     }
 }
+
+/// Always accessed through a `Mutex`.
+unsafe impl<T> Send for ChunkableInner<T> { }
