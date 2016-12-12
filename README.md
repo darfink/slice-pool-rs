@@ -13,7 +13,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-slice-pool = "0.3.0"
+slice-pool = "0.3.1"
 ```
 
 and this to your crate root:
