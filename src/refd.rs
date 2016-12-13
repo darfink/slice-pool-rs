@@ -24,6 +24,11 @@ impl<'a, T> SlicePoolRef<'a, T> {
             .map(|slice| PoolRef { inner: self.0.clone(), data: slice })
     }
 
+    /// Returns the number of allocations in the pool.
+    pub fn allocations(&self) -> usize {
+        (*self.0).borrow().allocations()
+    }
+
     /// Returns the pointer to the underlying slice.
     pub fn as_ptr(&self) -> *const T {
         (*self.0).borrow().memory.deref().as_ref().as_ptr()
@@ -121,6 +126,11 @@ impl<'a, T> ChunkableInner<'a, T> {
 
         self.values[index].free = true;
         self.defragment(index);
+    }
+
+    /// Returns the number of allocations in the slice.
+    fn allocations(&self) -> usize {
+        self.values.iter().filter(|chunk| !chunk.free).count()
     }
 
     /// Merges up to three adjacent (free) chunks.

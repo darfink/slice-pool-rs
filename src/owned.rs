@@ -24,10 +24,14 @@ impl<T> SlicePool<T> {
 
     /// Allocates a new chunk in the slice.
     pub fn allocate(&mut self, size: usize) -> Option<PoolVal<T>> {
-        (*self.0).lock()
-            .unwrap()
+        (*self.0).lock().unwrap()
             .allocate(size)
             .map(|slice| PoolVal { inner: self.0.clone(), data: slice })
+    }
+
+    /// Returns the number of allocations in the pool.
+    pub fn allocations(&self) -> usize {
+        (*self.0).lock().unwrap().allocations()
     }
 
     /// Returns the pointer to the underlying slice.
@@ -127,6 +131,11 @@ impl<T> ChunkableInner<T> {
 
         self.values[index].free = true;
         self.defragment(index);
+    }
+
+    /// Returns the number of allocations in the slice.
+    fn allocations(&self) -> usize {
+        self.values.iter().filter(|chunk| !chunk.free).count()
     }
 
     /// Merges up to three adjacent (free) chunks.
