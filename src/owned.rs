@@ -23,7 +23,7 @@ impl<T> SlicePool<T> {
     }
 
     /// Allocates a new chunk in the slice.
-    pub fn allocate(&mut self, size: usize) -> Option<PoolVal<T>> {
+    pub fn allocate(&self, size: usize) -> Option<PoolVal<T>> {
         (*self.0).lock().unwrap()
             .allocate(size)
             .map(|slice| PoolVal { inner: self.0.clone(), data: slice })

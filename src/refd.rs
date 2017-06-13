@@ -18,7 +18,7 @@ impl<'a, T> SlicePoolRef<'a, T> {
     }
 
     /// Allocates a new chunk in the slice.
-    pub fn allocate(&mut self, size: usize) -> Option<PoolRef<'a, T>> {
+    pub fn allocate(&self, size: usize) -> Option<PoolRef<'a, T>> {
         (*self.0).borrow_mut()
             .allocate(size)
             .map(|slice| PoolRef { inner: self.0.clone(), data: slice })
