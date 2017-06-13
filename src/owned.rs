@@ -5,15 +5,15 @@ use std::sync::{Arc, Mutex};
 use super::Chunk;
 
 /// Interface for any object compatible with `SlicePool`.
-pub trait Sliceable<T>: AsMut<[T]> + AsRef<[T]> { }
+pub trait Sliceable<T>: Send + AsMut<[T]> + AsRef<[T]> { }
 
 /// Implements the trait for vectors and similar types.
-impl<T, V> Sliceable<T> for V where V: AsRef<[T]> + AsMut<[T]> { }
+impl<T, V> Sliceable<T> for V where T: Send, V: Send + AsRef<[T]> + AsMut<[T]> { }
 
 /// A thread-safe interface for allocating chunks in an owned slice.
-pub struct SlicePool<T>(Arc<Mutex<ChunkableInner<T>>>);
+pub struct SlicePool<T: Send>(Arc<Mutex<ChunkableInner<T>>>);
 
-impl<T> SlicePool<T> {
+impl<T: Send> SlicePool<T> {
     /// Takes ownership of a slice with a chunkable interface
     pub fn new<Data: Sliceable<T> + 'static>(data: Data) -> Self {
         SlicePool(Arc::new(Mutex::new(ChunkableInner {
@@ -46,18 +46,18 @@ impl<T> SlicePool<T> {
 }
 
 /// An allocated chunk, that acts as a slice.
-pub struct PoolVal<T: 'static> {
+pub struct PoolVal<T: Send + 'static> {
     inner: Arc<Mutex<ChunkableInner<T>>>,
     data: &'static mut [T],
 }
 
-impl<T: fmt::Debug> fmt::Debug for PoolVal<T> {
+impl<T: Send + fmt::Debug> fmt::Debug for PoolVal<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.deref())
     }
 }
 
-impl<T> Deref for PoolVal<T> {
+impl<T: Send> Deref for PoolVal<T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -65,13 +65,13 @@ impl<T> Deref for PoolVal<T> {
     }
 }
 
-impl<T> DerefMut for PoolVal<T> {
+impl<T: Send> DerefMut for PoolVal<T> {
     fn deref_mut<'b>(&'b mut self) -> &'b mut [T] {
         self.data
     }
 }
 
-impl<T> Drop for PoolVal<T> {
+impl<T: Send> Drop for PoolVal<T> {
     /// Returns the ownership of the slice.
     fn drop(&mut self) {
         unsafe { (*self.inner).lock().unwrap().release(self.data) };
@@ -79,12 +79,12 @@ impl<T> Drop for PoolVal<T> {
 }
 
 /// Shared reference to the slice data.
-struct ChunkableInner<T> {
+struct ChunkableInner<T: Send> {
     values: Vec<Chunk>,
     memory: Box<Sliceable<T>>,
 }
 
-impl<T> ChunkableInner<T> {
+impl<T: Send> ChunkableInner<T> {
     /// Tries to allocate a new chunk with `size` in the slice.
     fn allocate(&mut self, size: usize) -> Option<&'static mut [T]> {
         // Check if there is any free chunk index with the required amount of memory
@@ -155,6 +155,3 @@ impl<T> ChunkableInner<T> {
         }
     }
 }
-
-/// Always accessed through a `Mutex`.
-unsafe impl<T> Send for ChunkableInner<T> { }

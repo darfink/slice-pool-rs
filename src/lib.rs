@@ -38,12 +38,14 @@ struct Chunk {
 
 #[cfg(test)]
 mod tests {
+    use std::thread;
+    use std::sync::Arc;
     use super::*;
 
     #[test]
     fn pool_ref() {
         let mut values = vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-        let mut memory = SlicePoolRef::new(&mut values);
+        let memory = SlicePoolRef::new(&mut values);
 
         let mem = {
             let mem = memory.allocate(2).unwrap();
@@ -64,7 +66,7 @@ mod tests {
     fn pool_owned() {
         let mem = {
             let values = vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-            let mut memory = SlicePool::new(values);
+            let memory = SlicePool::new(values);
 
             let mem = {
                 let mem = memory.allocate(2).unwrap();
@@ -82,5 +84,22 @@ mod tests {
             mem
         };
         assert_eq!(*mem, [30]);
+    }
+
+    #[test]
+    fn pool_owned_thread() {
+        let storage = SlicePool::new(vec![10, 20, 30, 40]);
+        let pool = Arc::new(storage);
+
+        let val = pool.allocate(2).unwrap();
+        assert_eq!(*val, [10, 20]);
+
+        let pool2 = pool.clone();
+        thread::spawn(move || {
+            let val = pool2.allocate(2).unwrap();
+            assert_eq!(*val, [30, 40]);
+        }).join().unwrap();
+
+        assert_eq!(pool.len(), 4);
     }
 }
