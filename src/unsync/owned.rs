@@ -1,33 +1,28 @@
 use super::ChunkChain;
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
+use std::rc::Rc;
 use std::{fmt, mem, slice};
 
-/// Interface for any slice compatible with a thread-safe `SlicePool`.
-pub trait Sliceable<T>: Send + Sync + AsMut<[T]> + AsRef<[T]> {}
+/// Interface for any slice compatible with a non thread-safe `SlicePool`.
+pub trait Sliceable<T>: AsMut<[T]> + AsRef<[T]> {}
 
 /// Implements the trait for vectors and similar types.
-impl<T, V> Sliceable<T> for V
-where
-  T: Send,
-  V: Send + Sync + AsRef<[T]> + AsMut<[T]>,
-{
+impl<T, V> Sliceable<T> for V where V: AsRef<[T]> + AsMut<[T]> {}
+
+/// A non thread-safe interface for allocating chunks in an owned slice.
+pub struct SlicePool<T> {
+  chain: Rc<ChunkChain>,
+  slice: Rc<Sliceable<T>>,
 }
 
-/// A thread-safe interface for allocating chunks in an owned slice.
-pub struct SlicePool<T: Send> {
-  chain: Arc<ChunkChain>,
-  slice: Arc<Sliceable<T>>,
-}
-
-impl<T: Send + 'static> SlicePool<T> {
+impl<T: 'static> SlicePool<T> {
   /// Constructs a new owned slice pool from a sliceable object.
   pub fn new<S: Sliceable<T> + 'static>(slice: S) -> Self {
     let size = slice.as_ref().len();
 
     SlicePool {
-      chain: Arc::new(ChunkChain::new(size)),
-      slice: Arc::new(slice),
+      chain: Rc::new(ChunkChain::new(size)),
+      slice: Rc::new(slice),
     }
   }
 
@@ -62,14 +57,14 @@ impl<T: Send + 'static> SlicePool<T> {
 }
 
 /// An allocation in an owned `SlicePool`.
-pub struct SliceBox<T: Send + 'static> {
+pub struct SliceBox<T: 'static> {
   #[allow(unused)]
-  slice: Arc<Sliceable<T>>,
-  chain: Arc<ChunkChain>,
+  slice: Rc<Sliceable<T>>,
+  chain: Rc<ChunkChain>,
   data: &'static mut [T],
 }
 
-impl<T: Send> Deref for SliceBox<T> {
+impl<T> Deref for SliceBox<T> {
   type Target = [T];
 
   fn deref(&self) -> &Self::Target {
@@ -77,13 +72,13 @@ impl<T: Send> Deref for SliceBox<T> {
   }
 }
 
-impl<T: Send> DerefMut for SliceBox<T> {
+impl<T> DerefMut for SliceBox<T> {
   fn deref_mut<'b>(&'b mut self) -> &'b mut [T] {
     self.data
   }
 }
 
-impl<T: Send> Drop for SliceBox<T> {
+impl<T> Drop for SliceBox<T> {
   /// Returns the ownership of the slice to the pool.
   fn drop(&mut self) {
     let base = (*self.slice).as_ref().as_ptr();
@@ -92,7 +87,7 @@ impl<T: Send> Drop for SliceBox<T> {
   }
 }
 
-impl<T: Send + fmt::Debug> fmt::Debug for SliceBox<T> {
+impl<T: fmt::Debug> fmt::Debug for SliceBox<T> {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{:?}", self.deref())
   }
@@ -101,8 +96,6 @@ impl<T: Send + fmt::Debug> fmt::Debug for SliceBox<T> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use std::sync::Arc;
-  use std::thread;
 
   #[test]
   fn pool_owned_lifetime() {
@@ -126,24 +119,6 @@ mod tests {
       alloc
     };
     assert_eq!(*alloc, [30]);
-  }
-
-  #[test]
-  fn pool_owned_thread() {
-    let storage = SlicePool::new(vec![10, 20, 30, 40]);
-    let pool = Arc::new(storage);
-
-    let val = pool.alloc(2).unwrap();
-    assert_eq!(*val, [10, 20]);
-
-    let pool2 = pool.clone();
-    thread::spawn(move || {
-      let val = pool2.alloc(2).unwrap();
-      assert_eq!(*val, [30, 40]);
-    }).join()
-    .unwrap();
-
-    assert_eq!(pool.len(), 4);
   }
 
   #[test]

@@ -23,6 +23,7 @@
 //! ```
 
 pub mod sync;
+pub mod unsync;
 
 /// A chunk of memory inside a slice.
 #[derive(Debug, Copy, Clone)]
