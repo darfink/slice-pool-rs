@@ -22,7 +22,7 @@ impl ChunkChain {
   pub fn allocate(&self, size: usize) -> Option<Chunk> {
     let mut chunks = self.0.borrow_mut();
 
-    // Find a chunk with the minimum amount of memory required
+    // Find a chunk with the least amount of memory required
     let (index, _) = chunks
       .iter()
       .enumerate()
