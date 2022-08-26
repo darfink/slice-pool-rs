@@ -65,10 +65,7 @@ impl ChunkChain {
 
       // Merge the free chunks
       chunks[start].free = true;
-      for i in (start+1)..=end {
-        chunks[start].size += chunks[i].size;
-      }
-      chunks.drain(start+1..=end);
+      chunks[start].size += chunks.drain(start+1..=end).map(|c| c.size).sum::<usize>();
     }
   }
 
