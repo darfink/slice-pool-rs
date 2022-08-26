@@ -173,4 +173,28 @@ mod tests {
     let val5 = pool.alloc(4).unwrap();
     assert_eq!(*val5, [30, 40, 50, 60]);
   }
+
+  #[test]
+  fn pool_complex_fragmentation() {
+    let pool = SlicePool::new(vec![10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
+  
+    let val1 = pool.alloc(2).unwrap();
+    assert_eq!(*val1, [10, 20]);
+  
+    let val2 = pool.alloc(2).unwrap();
+    assert_eq!(*val2, [30, 40]);
+  
+    let val3 = pool.alloc(2).unwrap();
+    assert_eq!(*val3, [50, 60]);
+  
+    mem::drop(val1);
+    mem::drop(val3);
+    mem::drop(val2);
+  
+    let val4 = pool.alloc(1).unwrap();
+    assert_eq!(*val4, [10]);
+  
+    let val5 = pool.alloc(1).unwrap();
+    assert_eq!(*val5, [20]);
+  }
 }
