@@ -36,26 +36,11 @@ impl ChunkChain {
       // Deduct the left over memory from the allocation
       chunks[index].size -= delta;
 
-      if Self::has_free_adjacent(&chunks, index, Order::Preceding) {
-        // Increase the size of the preceding chunk
-        chunks[index - 1].size += delta;
-
-        // Shift the offset of the allocated chunk
-        chunks[index].offset += delta;
-      } else if Self::has_free_adjacent(&chunks, index, Order::Following) {
-        // Update the size and offset of the next chunk
-        chunks[index + 1].offset -= delta;
-        chunks[index + 1].size += delta;
-      } else {
-        // Insert a new chunk representing the surplus memory
-        let offset = chunks[index].offset + size;
-        chunks.insert(index + 1, Chunk::with_offset(delta, offset));
-        chunks[index].free = false;
-      }
-    } else {
-      // The allocation covers a single chunk
-      chunks[index].free = false;
+      // Insert a new chunk representing the surplus memory
+      let offset = chunks[index].offset + size;
+      chunks.insert(index + 1, Chunk::with_offset(delta, offset));
     }
+    chunks[index].free = false;
 
     Some(chunks[index])
   }
@@ -66,22 +51,22 @@ impl ChunkChain {
     let index = chunks
       .binary_search_by_key(&offset, |chunk| chunk.offset)
       .expect("releasing chunk");
-    let size = chunks[index].size;
 
-    if Self::has_free_adjacent(&chunks, index, Order::Preceding) {
-      // Increase the preceding chunk's size
-      chunks[index - 1].size += size;
-    } else if Self::has_free_adjacent(&chunks, index, Order::Following) {
-      // Increase the extent of the next chunk
-      chunks[index + 1].offset -= size;
-      chunks[index + 1].size += size;
-    } else {
+    let preceding_free = Self::has_free_adjacent(&chunks, index, Order::Preceding);
+    let following_free = Self::has_free_adjacent(&chunks, index, Order::Following);
+
+    if !preceding_free && !following_free {
       // No free adjacent chunks, simply mark this one as free
       chunks[index].free = true;
-      return;
-    }
+    } else {
+      // Find range of free chunks.
+      let start = if preceding_free { index - 1 } else { index };
+      let end = if following_free { index + 1 } else { index };
 
-    chunks.remove(index);
+      // Merge the free chunks
+      chunks[start].free = true;
+      chunks[start].size += chunks.drain(start+1..=end).map(|c| c.size).sum::<usize>();
+    }
   }
 
   fn has_free_adjacent(chunks: &[Chunk], index: usize, order: Order) -> bool {
